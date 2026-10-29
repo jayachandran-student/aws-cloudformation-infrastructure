@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  S3 Bucket Setup
+  Creates a secure S3 bucket with versioning, encryption, and access controls.
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Unique name for the S3 bucket
+    Default: my-cloudformation-bucket
+
+  EnvironmentType:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - production
+    Description: Environment type
+
+  EnableVersioning:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Enable S3 versioning
+
+Conditions:
+  IsVersioningEnabled: !Equals [!Ref EnableVersioning, "true"]
+
+Resources:
+
+  # ─── S3 Bucket ───────────────────────────────────────────────
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${BucketName}-${EnvironmentType}"
+      VersioningConfiguration:
+        Status: !If [IsVersioningEnabled, Enabled, Suspended]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${BucketName}-${EnvironmentType}"
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+  # ─── S3 Bucket Policy ────────────────────────────────────────
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureConnections
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !Sub "arn:aws:s3:::${S3Bucket}"
+              - !Sub "arn:aws:s3:::${S3Bucket}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+Outputs:
+  BucketName:
+    Description: Name of the created S3 bucket
+    Value: !Ref S3Bucket
+    Export:
+      Name: !Sub "${EnvironmentType}-S3BucketName"
+
+  BucketArn:
+    Description: ARN of the S3 bucket
+    Value: !GetAtt S3Bucket.Arn
+    Export:
+      Name: !Sub "${EnvironmentType}-S3BucketArn"
+
+  BucketDomainName:
+    Description: Domain name of the S3 bucket
+    Value: !GetAtt S3Bucket.DomainName

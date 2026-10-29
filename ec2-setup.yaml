@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  EC2 Instance with Security Group
+  Provisions a t2.micro EC2 instance with SSH and HTTP access.
+
+Parameters:
+  EnvironmentType:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - production
+    Description: Environment type for the EC2 instance
+
+  KeyPairName:
+    Type: String
+    Description: Name of an existing EC2 KeyPair for SSH access
+    Default: my-key-pair
+
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    Description: EC2 instance type
+
+Mappings:
+  RegionAMIMap:
+    ap-south-1:
+      AMI: ami-0f58b397bc5c1f2e8   # Amazon Linux 2 - Mumbai
+    us-east-1:
+      AMI: ami-0cff7528ff583bf9a   # Amazon Linux 2 - N. Virginia
+
+Resources:
+
+  # ─── Security Group ──────────────────────────────────────────
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${EnvironmentType}-ec2-security-group"
+      GroupDescription: Allow SSH and HTTP access
+      SecurityGroupIngress:
+        # SSH access
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+          Description: SSH access
+        # HTTP access
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP access
+        # HTTPS access
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS access
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentType}-security-group"
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+  # ─── EC2 Instance ─────────────────────────────────────────────
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !FindInMap [RegionAMIMap, !Ref AWS::Region, AMI]
+      KeyName: !Ref KeyPairName
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentType}-ec2-instance"
+        - Key: Environment
+          Value: !Ref EnvironmentType
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+          echo "<h1>EC2 Instance deployed via CloudFormation</h1>" > /var/www/html/index.html
+
+Outputs:
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref EC2Instance
+    Export:
+      Name: !Sub "${EnvironmentType}-EC2InstanceId"
+
+  PublicIP:
+    Description: Public IP address of the EC2 instance
+    Value: !GetAtt EC2Instance.PublicIp
+    Export:
+      Name: !Sub "${EnvironmentType}-EC2PublicIP"
+
+  SecurityGroupId:
+    Description: Security Group ID
+    Value: !Ref EC2SecurityGroup
+    Export:
+      Name: !Sub "${EnvironmentType}-SecurityGroupId"

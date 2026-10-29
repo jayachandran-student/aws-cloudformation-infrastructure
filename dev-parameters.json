@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "EnvironmentType",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "KeyPairName",
+    "ParameterValue": "my-key-pair"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t2.micro"
+  },
+  {
+    "ParameterKey": "BucketName",
+    "ParameterValue": "my-cloudformation-bucket"
+  },
+  {
+    "ParameterKey": "EnableVersioning",
+    "ParameterValue": "true"
+  }
+]
